@@ -199,7 +199,7 @@ f = OSCFunc({ |msg, time, addr, recvPort|
 	envDur = msg[3];
 	s.sendMsg("n_set", nodeID, \amp, amp, \envDur, envDur);
 		
-}, '/setEnv', ~rem).add;
+}, '/setVolEnv', ~rem).add;
 );
 
 (
