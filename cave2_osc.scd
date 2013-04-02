@@ -213,10 +213,22 @@ g = OSCFunc({ |msg, time, addr, recvPort|
 	yPos = msg[3];
 	zPos = msg[4];
 	s.sendMsg("n_set", nodeID, \xPos, xPos, \yPos, yPos, \zPos, zPos);
-	
-	~proc.sendMsg("updateMonoSound", nodeID, xPos, zPos);
 		
 }, '/setObjectLoc', ~rem).add;
+);
+
+(
+//update reverb on sound object
+
+~verb = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, mix, roomSize;
+	
+	nodeID = msg[1];
+	mix = msg[2];
+	roomSize = msg[3];
+	s.sendMsg("n_set", nodeID, \mix, mix, \roomSize, roomSize);
+		
+}, '/setReverb', ~rem).add;
 );
 
 (
