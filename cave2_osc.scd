@@ -1,12 +1,13 @@
-///////////////////////////////////////////////////////////////////////////////////
-// 
-//  OmegaLib and LYRA Cluster Sound Server for CAVE2 
-//  at the Electronic Visualization Laboratory
-//	University of Illinois at Chicago
-//  Author:  JD Pirtle
-//  2012
-//
-//////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////
+// 											                       //
+//  	OmegaLib and LYRA Cluster Sound Server for CAVE2           //
+//  	at the Electronic Visualization Laboratory                 //
+//		University of Illinois at Chicago                          //
+//  	Author:  JD Pirtle						                   //
+//  	2012                                                       //
+//                                                                 //
+/////////////////////////////////////////////////////////////////////
+
 
 //create volume object
 v = s.volume;
@@ -54,19 +55,9 @@ b = OSCFunc({ |msg, time, addr, recvPort|
 );
 
 
-/////////////////////////////////////////////////////////////////////////////////////////                             
-//											 
-//
-//
-//						////OMEGALIB SECTION/////
-//
-//												
-//
-/////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-///////////////////////OMEGALIB MULTICHANNEL ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+///////////////////////OMEGALIB MULTICHANNEL ////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 (
 //load SynthDef on server
@@ -249,8 +240,9 @@ h = OSCFunc({ |msg, time, addr, recvPort|
 }, '/setListLoc', ~rem).add;
 );
 
-
-///////////////////OMEGALIB STEREO SOURCES//////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+///////////////////OMEGALIB STEREO SOURCES///////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 (
 //load SynthDef on server
@@ -325,9 +317,9 @@ j = OSCFunc({ |msg, time, addr, recvPort|
 }, '/freeBuf', ~rem).add;
 );
 
-
-/////////////////////////////// Server Volume and Mute Control ///////////////////////////////////
-
+/////////////////////////////////////////////////////////////////////////////////
+////////////////////////Server Volume and Mute Control //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 (
 //set volume
 
@@ -371,8 +363,9 @@ m = OSCFunc({ |msg, time, addr, recvPort|
 }, '/unMute');
 );
 
-
+/////////////////////////////////////////////////////////////////////////////////
 ////////////////////////// Playback for LYRA ////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 // Synthdef for LYRA Playback
 
@@ -438,76 +431,65 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 }, '/stopLyraStereo');
 );
 
-	
-////////////////////////// MIC ROUTING ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+////////////////////////// MIC ROUTING //////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
-// Synthdef for Mic Routing
-
+// Synthdef for Mic Routing to CAVE2
 (
-    SynthDef(\micRoute, {| amp = 0.0 |   
-	 var mic1, mic2;
+    SynthDef(\micLocal, {| amp = 0.0 |   
+	 var mic;
 	 
-	 mic1 = SoundIn.ar(0, 1, amp);
-	 mic2 = SoundIn.ar(1, 1, amp);
+	 mic = SoundIn.ar(0, 1, amp);
 	 
-	 Out.ar(24, mic1);
-	 Out.ar(25, mic2);
+	 Out.ar(2, mic);
+	 Out.ar(19, mic);
 	 Ê Ê Ê Ê 
 	}).add;
 );
 
 (
-// Start Mic Routing
+// Start Mic-->CAVE2
 
-p = OSCFunc({ |msg, time, addr, recvPort|
+~mics = OSCFunc({ |msg, time, addr, recvPort|
 
-	z = Synth.new("micRoute");
+	y = Synth.new("micLocal");
 	
-	postln("!! MICS ON !!");
+	postln("!! LOCAL MICS ON !!");
 		
-}, '/routeMics');
+}, '/routeLocalMics');
 );
 
 (
-// Stop Mic Routing
+// Stop Mic-->CAVE2
 
-q = OSCFunc({ |msg, time, addr, recvPort|
+~noMics = OSCFunc({ |msg, time, addr, recvPort|
 
-	z.free;
+	y.free;
 	
-	postln("!! MICS OFF !!");
+	postln("!! LOCAL MICS OFF !!");
 		
-}, '/killMics');
+}, '/killLocalMics');
 );
 
-////////////////////////////////////////////////////////////////////////////////////
 
-//Startup sound
 
-s.sendMsg("b_allocRead", 1000, "/Users/evldemo/sounds/jd/superfriends.wav");
+////////////////////////// VTC Support ////////////////////////////////////
 
+// Synthdef for Mic-->VTC
 (
-// play superfriends startup
-
-~startup = OSCFunc({ |msg, time, addr, recvPort|
-	var nodeID, bufNum = 1000, amp, loop; 
-	
-	nodeID = -1;
-	bufNum = 1;
-	amp = 0.5;
-	loop = 0.0;
-	
-	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop);
-	
-	postln("!! OmegaSound Working !!");
-		
-}, '/startup', ~rem);
+    SynthDef(\micVTC, {| amp = 0.0 |   
+	 var mic;
+	 
+	 mic = SoundIn.ar(0, 1, amp);
+	 
+	 Out.ar(22, mic);
+	 Out.ar(23, mic);
+	 Ê Ê Ê Ê 
+	}).add;
 );
 
-////////////////////////// Laptop Support ////////////////////////////////////
-
-// Synthdef for Laptop-->Speaker routing
-
+// Synthdef for VTC-->Speaker routing
 ( 
 	SynthDef(\Laptops, {| amp = 0.0 |   
 	 var sourceR, sourceL;
@@ -521,30 +503,52 @@ s.sendMsg("b_allocRead", 1000, "/Users/evldemo/sounds/jd/superfriends.wav");
 	}).add;
 );	
  
+(
+// Start Mic-->VTC
+
+p = OSCFunc({ |msg, time, addr, recvPort|
+
+	z = Synth.new("micVTC");
+	
+	postln("!! MICS ON !!");
+		
+}, '/routeExtMics');
+);
 
 (
-// Start Laptop Playback (from localhost)
+// Stop Mic-->VTC
+
+q = OSCFunc({ |msg, time, addr, recvPort|
+
+	z.free;
+	
+	postln("!! MICS OFF !!");
+		
+}, '/killExtMics');
+);
+
+(
+// Start VTC Playback
 
 ~startmics = OSCFunc({ |msg, time, addr, recvPort|
 
 	~lap = Synth.new("Laptops");
 
-	postln("!! LAPTOP CONNECTED !!");
+	postln("!! VTC-->SPEAKERS CONNECTED !!");
 		
-}, '/playlaptop');
+}, '/playVTC');
 );
 
-
 (
-// Stop Laptop Playback Local
+// Stop VTC Playback Local
 
 ~stopMics = OSCFunc({ |msg, time, addr, recvPort|
 
 	~lap.free;
 	
-	postln("!! LAPTOP DISCONNECTED !!");
+	postln("!! VTC-->SPEAKERS DISCONNECTED !!");
 		
-}, '/stopLaptop');
+}, '/stopVTC');
 );
 
 ///////////////////////////////////////////////////////////////////////
@@ -652,7 +656,29 @@ SynthDef(\playSine, {| freq, tone, amp, dur, xPos, yPos, zPos, xLPos, yLPos, zLP
 }).add;
 );
 
+////////////////////////////////////////////////////////////////////////////////////
 
+//Startup sound
+
+s.sendMsg("b_allocRead", 1000, "/Users/evldemo/sounds/jd/superfriends.wav");
+
+(
+// play superfriends startup
+
+~startup = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, bufNum = 1000, amp, loop; 
+	
+	nodeID = -1;
+	bufNum = 1;
+	amp = 0.5;
+	loop = 0.0;
+	
+	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop);
+	
+	postln("!! OmegaSound Working !!");
+		
+}, '/startup', ~rem);
+);
 
 ////////////////////////////////////////////////////////////////////////////////////
 
