@@ -504,52 +504,32 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 );	
  
 (
-// Start Mic-->VTC
+// Start VTC
 
 p = OSCFunc({ |msg, time, addr, recvPort|
 
 	z = Synth.new("micVTC");
+	~lap = Synth.new("localVTC");
 	
 	postln("!! MICS ON !!");
 		
-}, '/routeExtMics');
+}, '/startVTC');
 );
 
 (
-// Stop Mic-->VTC
+// Stop VTC
 
 q = OSCFunc({ |msg, time, addr, recvPort|
 
 	z.free;
+	~lap.free;
 	
 	postln("!! MICS OFF !!");
 		
-}, '/killExtMics');
-);
-
-(
-// Start VTC Playback
-
-~startmics = OSCFunc({ |msg, time, addr, recvPort|
-
-	~lap = Synth.new("localVTC");
-
-	postln("!! VTC-->SPEAKERS CONNECTED !!");
-		
-}, '/playVTC');
-);
-
-(
-// Stop VTC Playback Local
-
-~stopMics = OSCFunc({ |msg, time, addr, recvPort|
-
-	~lap.free;
-	
-	postln("!! VTC-->SPEAKERS DISCONNECTED !!");
-		
 }, '/stopVTC');
 );
+
+
 
 ///////////////////////////////////////////////////////////////////////
 // 		7.1 Routing
