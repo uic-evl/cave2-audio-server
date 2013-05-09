@@ -442,8 +442,8 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 	 
 	 mic = SoundIn.ar(0, 1, amp);
 	 
-	 Out.ar(2, mic);
-	 Out.ar(19, mic);
+	 Out.ar([6, 7, 20], mic);
+	 Out.ar([13, 14, 21], mic);
 	 Ê Ê Ê Ê 
 	}).add;
 );
@@ -491,11 +491,11 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 
 // Synthdef for VTC-->Speaker routing
 ( 
-	SynthDef(\Laptops, {| amp = 0.0 |   
+	SynthDef(\localVTC, {| amp = 0.0 |   
 	 var sourceR, sourceL;
 	 
 	 sourceR = SoundIn.ar(11, 1, amp);
-	 sourceL = SoundIn.ar(12, 1, amp);
+	 sourceL = SoundIn.ar(10, 1, amp);
 	 
 	 Out.ar([6, 7, 20], sourceL);
 	 Out.ar([13, 14, 21], sourceR);
@@ -532,7 +532,7 @@ q = OSCFunc({ |msg, time, addr, recvPort|
 
 ~startmics = OSCFunc({ |msg, time, addr, recvPort|
 
-	~lap = Synth.new("Laptops");
+	~lap = Synth.new("localVTC");
 
 	postln("!! VTC-->SPEAKERS CONNECTED !!");
 		
