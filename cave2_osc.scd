@@ -123,10 +123,11 @@ c = OSCFunc({ |msg, time, addr, recvPort|
 //load buffer
 
 d = OSCFunc({ |msg, time, addr, recvPort|
-	var bufNum, path;
+	var bufNum, fileName, path;
 	
 	bufNum = msg[1];
-	path = msg[2];
+	fileName = msg[2];
+	path = "/Users/evldemo/sounds/" ++ fileName;
 	s.sendMsg("b_allocRead", bufNum, path);
 	postln("buffer loaded");
 	
@@ -453,7 +454,7 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 
 ~mics = OSCFunc({ |msg, time, addr, recvPort|
 
-	y = Synth.new("micLocal");
+	~micOn = Synth.new("micLocal");
 	
 	postln("!! LOCAL MICS ON !!");
 		
@@ -465,7 +466,7 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 
 ~noMics = OSCFunc({ |msg, time, addr, recvPort|
 
-	y.free;
+	~micOn.free;
 	
 	postln("!! LOCAL MICS OFF !!");
 		
@@ -508,10 +509,10 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 
 p = OSCFunc({ |msg, time, addr, recvPort|
 
-	z = Synth.new("micVTC");
-	~lap = Synth.new("localVTC");
+	~micV = Synth.new("micVTC");
+	~local = Synth.new("localVTC");
 	
-	postln("!! MICS ON !!");
+	postln("!! VTC ON !!");
 		
 }, '/startVTC');
 );
@@ -521,10 +522,10 @@ p = OSCFunc({ |msg, time, addr, recvPort|
 
 q = OSCFunc({ |msg, time, addr, recvPort|
 
-	z.free;
-	~lap.free;
+	~micV.free;
+	~local.free;
 	
-	postln("!! MICS OFF !!");
+	postln("!! VTC OFF !!");
 		
 }, '/stopVTC');
 );
