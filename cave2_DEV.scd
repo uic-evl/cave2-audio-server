@@ -9,13 +9,14 @@
 /////////////////////////////////////////////////////////////////////
 
 
+(
+
 //create volume object
 v = s.volume;
 
 //set volume range
 v.setVolumeRange(-90, 8);
 
-(
 
 //lyra ip
 ~rem = NetAddr("131.193.78.203", nil);
@@ -64,7 +65,7 @@ b = OSCFunc({ |msg, time, addr, recvPort|
 c = OSCFunc({ |msg, time, addr, recvPort|
 	 
 	//playback SynthDef
-    SynthDef(\PlaySound, {| amp = 1.0, envDur, bufNum, xPos, yPos, zPos, xLPos, yLPos, zLPos, width, mix, roomSize, loop, attTime, susTime, relTime, susLevel |
+    SynthDef(\PlaySound, {| amp = 1.0, envDur, bufNum, xPos, yPos, zPos, xLPos, yLPos, zLPos, width, mix, roomSize, loop, playRate = 1, trigger = 0, startFrame = 0 |
 	var env, source, subPos, numChan = 20, dist, postVol, preVol, volScale, pos, envTrig;
 	
 	
@@ -102,7 +103,7 @@ c = OSCFunc({ |msg, time, addr, recvPort|
 	postVol = amp*volScale;
 	
 	//source
-	source = PlayBuf.ar(1, bufNum, BufRateScale.kr(bufNum), 1, 0, loop: loop, doneAction:2);
+	source = PlayBuf.ar(1, bufNum, playRate, trigger, startFrame, loop: loop, doneAction:2);
 	
 	//add some reverb
 	source = FreeVerb.ar(source, mix, roomSize, damp: 0.5, mul: 1, add: 0);
@@ -140,7 +141,7 @@ d = OSCFunc({ |msg, time, addr, recvPort|
 //create new instance of mono synth
 
 e = OSCFunc({ |msg, time, addr, recvPort|
-	var nodeID, bufNum, amp, xPos, yPos, zPos, xLPos, yLPos, zLPos, width, mix, roomSize, loop, attTime, susTime, relTime, susLevel;
+	var nodeID, bufNum, amp, xPos, yPos, zPos, xLPos, yLPos, zLPos, width, mix, roomSize, loop, playRate, trigger, startFrame;
 	
 	nodeID = msg[1];
 	bufNum = msg[2];
@@ -155,14 +156,14 @@ e = OSCFunc({ |msg, time, addr, recvPort|
 	mix = msg[11];
 	roomSize = msg[12];
 	loop = msg[13];
-	attTime = msg[14];
-	susTime = msg[15];
-	relTime = msg[16];
-	susLevel = msg[17];
+	playRate = msg[14];
+	trigger = msg[15];
+	startFrame = msg[16];
+	
 	
 	~lyra.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
 	
-	s.sendMsg("s_new", "PlaySound", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \xPos, xPos, \yPos, yPos, \zPos, zPos, \xLPos, xLPos, \yLPos, yLPos, \zLPos, zLPos, \width, width, \mix, mix, \roomSize, roomSize, \loop, loop, \attTime, attTime, \susTime, susTime, \relTime, relTime, \susLevel, susLevel);
+	s.sendMsg("s_new", "PlaySound", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \xPos, xPos, \yPos, yPos, \zPos, zPos, \xLPos, xLPos, \yLPos, yLPos, \zLPos, zLPos, \width, width, \mix, mix, \roomSize, roomSize, \loop, loop, \playRate, playRate, \trigger, trigger, \startFrame, startFrame);
 		
 }, '/play', ~rem).add;
 );
@@ -184,7 +185,7 @@ f = OSCFunc({ |msg, time, addr, recvPort|
 );
 
 (
-//fade in/out synth instance
+//fade in/out MONO synth instance
 
 ~envFunc = OSCFunc({ |msg, time, addr, recvPort|
 	var nodeID, amp, envDur;
@@ -241,6 +242,39 @@ h = OSCFunc({ |msg, time, addr, recvPort|
 }, '/setListLoc', ~rem).add;
 );
 
+(
+//update frame being played back
+// '0' is the beginning of a file
+
+~setMonoFrame = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, trigger, startFrame;
+	
+	nodeID = msg[1];
+	trigger = 1;
+	startFrame = msg[3];
+
+	s.sendMsg("n_set", nodeID, \trigger, trigger, \startFrame, startFrame);
+		
+}, '/setMonoFrame', ~rem).add;
+);
+
+
+(
+//update playback rate
+// 1.0 is the server's sample rate, 2.0 is one octave up, 0.5 is one octave down 
+// -1.0 is backwards normal rate
+
+~setMonoRate = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, playRate;
+	
+	nodeID = msg[1];
+	playRate = msg[2];
+
+	s.sendMsg("n_set", nodeID, \playRate, playRate);
+		
+}, '/setMonoRate', ~rem).add;
+);
+
 /////////////////////////////////////////////////////////////////////////////////
 ///////////////////OMEGALIB STEREO SOURCES///////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
@@ -249,13 +283,17 @@ h = OSCFunc({ |msg, time, addr, recvPort|
 //load SynthDef on server
 r = OSCFunc({ |msg, time, addr, recvPort|
 
- SynthDef(\playStereo, {| bufNum, amp, loop |   
-	 var sourceR, sourceL, source;
+ SynthDef(\playStereo, {| bufNum, amp, loop, envDur, playRate = 1, trigger = 0, startFrame = 0  |   
+	 var sourceR, sourceL, source, envTrig;
 	 
 	 //source is a stereo file
-	 source = PlayBuf.ar(2, bufNum, BufRateScale.kr(bufNum), 1, 0, loop: loop, doneAction:2);
+	 source = PlayBuf.ar(2, bufNum, playRate, trigger, startFrame, loop: loop, doneAction:2);
 	 
 	 amp = amp.linlin(0.0, 1.0, 0.0, 1.0, clip: \minmax);
+	 
+	 //envelope to fade in/out
+	 envTrig = HPZ1.kr(amp).abs > 0;
+     amp = EnvGen.kr(Env([amp, amp], [envDur]), envTrig);
 	  
 	 source = source*amp;
 	 
@@ -278,20 +316,36 @@ r = OSCFunc({ |msg, time, addr, recvPort|
 //create new instance of stereo synth
 
 t = OSCFunc({ |msg, time, addr, recvPort|
-	var nodeID, bufNum, amp, loop;
+	var nodeID, bufNum, amp, loop, playRate, trigger, startFrame;
 	
 	nodeID = msg[1];
 	bufNum = msg[2];
 	amp = msg[3];
 	loop = msg[4];
+	playRate = msg[5];
+	trigger = msg[6];
+	startFrame = msg[7];
 	
 	~lyra.sendMsg("newStereoSound", nodeID, bufNum, amp);
 	
-	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop);
+	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop, \playRate, playRate, \trigger, trigger, \startFrame, startFrame);
 	postln("new stereo synth !!");	
 }, '/playStereo', ~rem).add;
 );
 
+(
+//fade in/out STEREO synth instance
+
+~envStereo = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, amp, envDur;
+	
+	nodeID = msg[1];
+	amp = msg[2];
+	envDur = msg[3];
+	s.sendMsg("n_set", nodeID, \amp, amp, \envDur, envDur);
+		
+}, '/setSterVolEnv', ~rem).add;
+);
 
 (
 //free node
@@ -316,6 +370,38 @@ j = OSCFunc({ |msg, time, addr, recvPort|
 	postln("buffer freed");
 		
 }, '/freeBuf', ~rem).add;
+);
+
+(
+//update frame being played back
+// '0' is the beginning of a file
+
+~setStereoFrame = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, trigger, startFrame;
+	
+	nodeID = msg[1];
+	trigger = 1;
+	startFrame = msg[3];
+
+	s.sendMsg("n_set", nodeID, \trigger, trigger, \startFrame, startFrame);
+		
+}, '/setStereoFrame', ~rem).add;
+);
+
+(
+//update playback rate
+// 1.0 is the server's sample rate, 2.0 is one octave up, 0.5 is one octave down 
+// -1.0 is backwards normal rate
+
+~setStereoRate = OSCFunc({ |msg, time, addr, recvPort|
+	var nodeID, trigger, playRate;
+	
+	nodeID = msg[1];
+	playRate = msg[2];
+
+	s.sendMsg("n_set", nodeID, \playRate, playRate);
+		
+}, '/setStereoRate', ~rem).add;
 );
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -666,7 +752,7 @@ s.sendMsg("b_allocRead", 1000, "/Users/evldemo/sounds/jd/superfriends.wav");
 postln("        ");
 postln("        ");
 postln("        ");
-postln(" +++++++++++ !!! CAVE2 AUDIO SERVER IS LOADED !!! +++++++++++ ");
+postln(" +++++ !!! CAVE2 **DEVELOPMENT** AUDIO SERVER IS LOADED !!! +++++");
 postln("        ");
 postln("        ");
 postln("        ");
