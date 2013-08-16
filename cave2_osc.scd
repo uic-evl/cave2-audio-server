@@ -15,6 +15,9 @@ v = s.volume;
 //set volume range
 v.setVolumeRange(-90, 8);
 
+//set initial volume to lower range
+v.volume_(-15);
+
 (
 
 //lyra ip
@@ -25,6 +28,9 @@ v.setVolumeRange(-90, 8);
 
 //send to lyra for processing app
 ~lyra = NetAddr("131.193.78.203", 8000);
+
+//send to status app (currently jd's laptop)
+~status = NetAddr("131.193.77.51", 13000);
 
 //send to lyra (omicron)
 ~omi = NetAddr("131.193.78.203", 12000);
@@ -132,6 +138,7 @@ d = OSCFunc({ |msg, time, addr, recvPort|
 	postln("buffer loaded");
 	
 	~omi.sendMsg("buffer " + bufNum + " loaded");
+	~status.sendMsg("buffer " + bufNum + " loaded");
 
 }, '/loadBuffer', ~rem).add;
 );
@@ -160,7 +167,7 @@ e = OSCFunc({ |msg, time, addr, recvPort|
 	relTime = msg[16];
 	susLevel = msg[17];
 	
-	~lyra.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
+	~status.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
 	
 	s.sendMsg("s_new", "PlaySound", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \xPos, xPos, \yPos, yPos, \zPos, zPos, \xLPos, xLPos, \yLPos, yLPos, \zLPos, zLPos, \width, width, \mix, mix, \roomSize, roomSize, \loop, loop, \attTime, attTime, \susTime, susTime, \relTime, relTime, \susLevel, susLevel);
 		
@@ -177,6 +184,8 @@ f = OSCFunc({ |msg, time, addr, recvPort|
 	nodeID = msg[1];
 	amp = msg[2];
 	s.sendMsg("n_set", nodeID, \amp, amp);
+
+	~status.sendMsg("updateVol", nodeID, amp);
 
 	postln("setVol!!");
 		
@@ -208,6 +217,8 @@ g = OSCFunc({ |msg, time, addr, recvPort|
 	yPos = msg[3];
 	zPos = msg[4];
 	s.sendMsg("n_set", nodeID, \xPos, xPos, \yPos, yPos, \zPos, zPos);
+	
+	~status.sendMsg("updateMonoLoc", nodeID, xPos, zPos);
 		
 }, '/setObjectLoc', ~rem).add;
 );
@@ -285,7 +296,7 @@ t = OSCFunc({ |msg, time, addr, recvPort|
 	amp = msg[3];
 	loop = msg[4];
 	
-	~lyra.sendMsg("newStereoSound", nodeID, bufNum, amp);
+	~status.sendMsg("newStereoSound", nodeID, bufNum, amp);
 	
 	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop);
 	postln("new stereo synth !!");	
@@ -301,6 +312,9 @@ i = OSCFunc({ |msg, time, addr, recvPort|
 	
 	nodeID = msg[1];
 	s.sendMsg("n_free", nodeID);
+	
+	~status.sendMsg("nodeFreed", nodeID);
+	
 	postln("node freed");	
 }, '/freeNode', ~rem).add;
 );
@@ -329,9 +343,7 @@ k = OSCFunc({ |msg, time, addr, recvPort|
 	var amp;
 	
 	amp = msg[1];
-	//remap range from 0.0 -- 1.0 to -30 -- 8
-	//amp = amp.linlin(0.0, 1.0, -30, 8, clip: \minmax);
-	v.volume = amp;
+	v.volume_(amp);
 	
 	postln("Volume is " + amp);
     
@@ -390,8 +402,9 @@ SynthDef(\PlayLyra, {| amp = 0.0 |
 n = OSCFunc({ |msg, time, addr, recvPort|
 
 	x = Synth.new("PlayLyra");
-
+	
 	postln("!! LYRA AUDIO LOADED !!");
+
 		
 }, '/playLyraStereo');
 );
@@ -404,6 +417,8 @@ w = OSCFunc({ |msg, time, addr, recvPort|
 	x = Synth.new("PlayLyra");
 
 	postln("!! LYRA AUDIO LOADED !!");
+	//set initial volume to lower range
+	v.volume_(-10);
 		
 }, '/playLyraStereoLocal');
 );
