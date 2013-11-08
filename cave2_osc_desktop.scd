@@ -15,7 +15,22 @@ var nChannels = 2; // CAVE2 = 20
 
 // This specifies the base directory of all sounds
 // Note: make sure the path ends with a '/'
-var soundPath = "/Users/evldemo/sounds/"; 
+var soundPath = "C:/SoundServer/sounds/"; 
+//var soundPath = "/Users/evldemo/sounds/";
+
+var initialVolume = -15; // CAVE2 = -15, desktop = 0
+
+var masterNodeIP = "127.0.0.1";
+var statusDisplayIP = "127.0.0.1"; // Processing Status Display
+var webAppIP = "127.0.0.1"; // Web app
+
+var stereoLeftChannels = [0]; // CAVE2 = [6,7,20]
+var stereoRightChannels = [1]; // CAVE2 = [13,14,21]
+
+// Set server sample rate
+s.options.sampleRate= 48000;
+
+
 
 //create volume object
 v = s.volume;
@@ -24,23 +39,23 @@ v = s.volume;
 v.setVolumeRange(-90, 8);
 
 //set initial volume to lower range
-v.volume_(-15);
+v.volume_(initialVolume);
 
-//lyra ip
-~rem = NetAddr("127.0.0.1", nil);
+//master ip
+~rem = NetAddr(masterNodeIP, nil);
 
 //local ip
 ~loc = NetAddr("127.0.0.1", nil);
 
 //send to lyra for processing app
-~lyra = NetAddr("127.0.0.1", 8000);
+~lyra = NetAddr(statusDisplayIP, 8000);
 
 //send to lyra (omicron)
-~omi = NetAddr("127.0.0.1", 12000);
+~omi = NetAddr(masterNodeIP, 12000);
 
 //web app ip
 thisProcess.openUDPPort(3131);
-~app = NetAddr("127.0.0.1", 3131);
+~app = NetAddr(webAppIP, 3131);
 
 (
 //start server
@@ -141,7 +156,7 @@ d = OSCFunc({ |msg, time, addr, recvPort|
 	postln("buffer loaded");
 	
 	~omi.sendMsg("buffer " + bufNum + " loaded");
-
+	 
 }, '/loadBuffer', ~rem).add;
 );
 
@@ -311,8 +326,8 @@ r = OSCFunc({ |msg, time, addr, recvPort|
 	 sourceR = source[1];
 	 sourceL = source[0];
 	
-	 Out.ar([0], sourceL);
-	 Out.ar([1], sourceR);
+	 Out.ar(stereoLeftChannels, sourceL);
+	 Out.ar(stereoRightChannels, sourceR);
 	 Ê Ê Ê Ê 
 	}).add;
 	
@@ -326,7 +341,7 @@ r = OSCFunc({ |msg, time, addr, recvPort|
 //create new instance of stereo synth
 
 t = OSCFunc({ |msg, time, addr, recvPort|
-	var nodeID, bufNum, amp, loop, playRate, trigger, startFrame;
+	var nodeID, bufNum, amp, loop, playRate, trigger, startFrame, rateRatio;
 	
 	nodeID = msg[1];
 	bufNum = msg[2];
