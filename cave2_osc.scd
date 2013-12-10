@@ -4,12 +4,36 @@
 //  	at the Electronic Visualization Laboratory                 //
 //		University of Illinois at Chicago                          //
 //  	Author:  JD Pirtle						                   //
-//  	2012                                                       //
+//  	2012-2013                                                       //
 //                                                                 //
 /////////////////////////////////////////////////////////////////////
-
+// Last revision: 2013-12-10
+// Note: Config variables moved to top of file
+// Fixed stereo/surround/mic/vtc synth freed before re-creation
 
 (
+
+var nChannels = 20; // CAVE2 = 20
+
+// This specifies the base directory of all sounds
+// Note: make sure the path ends with a '/'
+var soundPath = "/Users/evldemo/sounds/";
+
+var initialVolume = -15; // CAVE2 = -15, desktop = 0
+
+var masterNodeIP = "131.193.78.203";
+var statusDisplayIP = "131.193.78.203"; // Processing Status Display
+var webAppIP = "127.0.0.1"; // Web app
+
+var stereoLeftChannels = [6,7,20]; // CAVE2 = [6,7,20]
+var stereoRightChannels = [13,14,21]; // CAVE2 = [13,14,21]
+var firstSpeakerChannel = 0; // CAVE2 = 0 (speakers 0-19)
+var firstSubChannel = 20; // CAVE2 = 20 (subs 20-21)
+
+// Set server sample rate
+s.options.sampleRate= 48000;
+
+
 
 //create volume object
 v = s.volume;
@@ -18,23 +42,23 @@ v = s.volume;
 v.setVolumeRange(-90, 8);
 
 //set initial volume to lower range
-v.volume_(-15);
+v.volume_(initialVolume);
 
-//lyra ip
-~rem = NetAddr("131.193.78.203", nil);
+//master ip
+~rem = NetAddr(masterNodeIP, nil);
 
 //local ip
 ~loc = NetAddr("127.0.0.1", nil);
 
 //send to lyra for processing app
-~lyra = NetAddr("131.193.78.203", 8000);
+~lyra = NetAddr(statusDisplayIP, 8000);
 
 //send to lyra (omicron)
-~omi = NetAddr("131.193.78.203", 12000);
+~omi = NetAddr(masterNodeIP, 12000);
 
 //web app ip
 thisProcess.openUDPPort(3131);
-~app = NetAddr("127.0.0.1", 3131);
+~app = NetAddr(webAppIP, 3131);
 
 (
 //start server
@@ -68,7 +92,7 @@ c = OSCFunc({ |msg, time, addr, recvPort|
 	 
 	//playback SynthDef
     SynthDef(\PlaySound, {| amp = 1.0, envDur, bufNum, xPos, yPos, zPos, xLPos, yLPos, zLPos, width, mix, roomSize, loop, playRate = 1, trigger = 0, startFrame = 0 |
-	var env, source, subPos, numChan = 20, dist, postVol, preVol, volScale, pos, envTrig;
+	var env, source, subPos, numChan = nChannels, dist, postVol, preVol, volScale, pos, envTrig;
 	
 	
 	xPos.poll(Impulse.kr(1), "xPos = ");
@@ -111,10 +135,10 @@ c = OSCFunc({ |msg, time, addr, recvPort|
 	source = FreeVerb.ar(source, mix, roomSize, damp: 0.5, mul: 1, add: 0);
 	
 	//out for speakers
-	Out.ar(0, PanAz.ar(numChan, source, pos, postVol, width, 0));
+	Out.ar( firstSpeakerChannel, PanAz.ar(numChan, source, pos, postVol, width, 0));
 	
 	//out for subs
-	Out.ar(20, Pan2.ar(source, pos, postVol));Ê
+	Out.ar( firstSubChannel, Pan2.ar(source, pos, postVol));Ê
 	Ê Ê Ê Ê 
 	}).add;
 	postln("synth loaded");
@@ -130,7 +154,7 @@ d = OSCFunc({ |msg, time, addr, recvPort|
 	
 	bufNum = msg[1];
 	fileName = msg[2];
-	path = "/Users/evldemo/sounds/" ++ fileName;
+	path = soundPath ++ fileName;
 	s.sendMsg("b_allocRead", bufNum, path);
 	postln("buffer loaded");
 	
@@ -305,8 +329,8 @@ r = OSCFunc({ |msg, time, addr, recvPort|
 	 sourceR = source[1];
 	 sourceL = source[0];
 	
-	 Out.ar([6, 7, 20], sourceL);
-	 Out.ar([13, 14, 21], sourceR);
+	 Out.ar(stereoLeftChannels, sourceL);
+	 Out.ar(stereoRightChannels, sourceR);
 	 Ê Ê Ê Ê 
 	}).add;
 	
@@ -467,8 +491,8 @@ SynthDef(\PlayLyra, {| amp = 0.0 |
 	 sourceL = SoundIn.ar(2, 1, amp);
 	 sourceR = SoundIn.ar(3, 1, amp);
 	 
-	 Out.ar([6, 7, 20], sourceL);
-	 Out.ar([13, 14, 21], sourceR);
+	 Out.ar(stereoLeftChannels, sourceL);
+	 Out.ar(stereoRightChannels, sourceR);
 	 Ê Ê Ê Ê 
 	}).add;
 );	
@@ -479,6 +503,7 @@ SynthDef(\PlayLyra, {| amp = 0.0 |
 
 n = OSCFunc({ |msg, time, addr, recvPort|
 
+	x.free;
 	x = Synth.new("PlayLyra");
 
 	postln("!! LYRA AUDIO LOADED !!");
@@ -490,7 +515,8 @@ n = OSCFunc({ |msg, time, addr, recvPort|
 // Start LYRA Playback (from localhost)
 
 w = OSCFunc({ |msg, time, addr, recvPort|
-
+	
+	x.free;
 	x = Synth.new("PlayLyra");
 
 	postln("!! LYRA AUDIO LOADED !!");
@@ -533,8 +559,8 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 	 
 	 mic = SoundIn.ar(0, 1, amp);
 	 
-	 Out.ar([6, 7, 20], mic);
-	 Out.ar([13, 14, 21], mic);
+	 Out.ar(stereoLeftChannels, mic);
+	 Out.ar(stereoRightChannels, mic);
 	 Ê Ê Ê Ê 
 	}).add;
 );
@@ -543,7 +569,7 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 // Start Mic-->CAVE2
 
 ~mics = OSCFunc({ |msg, time, addr, recvPort|
-
+	~micOn.free;
 	~micOn = Synth.new("micLocal");
 	
 	postln("!! LOCAL MICS ON !!");
@@ -588,8 +614,8 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 	 sourceR = SoundIn.ar(11, 1, amp);
 	 sourceL = SoundIn.ar(10, 1, amp);
 	 
-	 Out.ar([6, 7, 20], sourceL);
-	 Out.ar([13, 14, 21], sourceR);
+	 Out.ar(stereoLeftChannels, sourceL);
+	 Out.ar(stereoRightChannels, sourceR);
 	 Ê Ê Ê Ê 
 	}).add;
 );	
@@ -598,7 +624,10 @@ o = OSCFunc({ |msg, time, addr, recvPort|
 // Start VTC
 
 p = OSCFunc({ |msg, time, addr, recvPort|
-
+	
+	~micV.free;
+	~local.free;
+	
 	~micV = Synth.new("micVTC");
 	~local = Synth.new("localVTC");
 	
@@ -655,6 +684,7 @@ q = OSCFunc({ |msg, time, addr, recvPort|
 
 ~playSevenOne = OSCFunc({ |msg, time, addr, recvPort|
 
+	~seven.free;
 	~seven = Synth.new("sevenOne");
 
 	postln("!! 7.1 CONNECTED !!");
@@ -757,10 +787,11 @@ postln("        ");
 postln("        ");
 postln("        ");
 postln(" +++++ !!! CAVE2 AUDIO SERVER IS LOADED !!! +++++");
+postln(" ++++ Supports Omegalib Version 4.2 and above ++++ ");
 postln("        ");
 postln("        ");
 postln("        ");
-
+postln("  The file path '"+soundPath+"' will be pre-pended to all loaded sounds.");
 
 /////////////////////////////////////////////////////////////////////////////////
 
