@@ -22,7 +22,8 @@ var soundPath = "/Users/evldemo/sounds/";
 var initialVolume = -15; // CAVE2 = -15, desktop = 0
 
 var masterNodeIP = "131.193.78.203";
-var statusDisplayIP = "131.193.78.203"; // Processing Status Display
+var statusDisplayIP = "131.193.78.136"; // Processing Status Display
+var statusDisplayIP2 = "131.193.77.108"; // Processing Status Display
 var webAppIP = "127.0.0.1"; // Web app
 
 var stereoLeftChannels = [6,7,20]; // CAVE2 = [6,7,20]
@@ -50,8 +51,9 @@ v.volume_(initialVolume);
 //local ip
 ~loc = NetAddr("127.0.0.1", nil);
 
-//send to lyra for processing app
-~lyra = NetAddr(statusDisplayIP, 8000);
+//send to processing status app
+~status = NetAddr(statusDisplayIP, 8000);
+~status2 = NetAddr(statusDisplayIP2, 8000);
 
 //send to lyra (omicron)
 ~omi = NetAddr(masterNodeIP, 12000);
@@ -66,6 +68,9 @@ a = OSCFunc({ |msg, time, addr, recvPort|
 	
 	s.boot;
 	~omi.sendMsg("server started");	
+	
+	~status.sendMgs("soundServerStarted");
+	~status2.sendMgs("soundServerStarted");
 	
 }, '/startServer', ~rem).add;
 );
@@ -189,7 +194,8 @@ e = OSCFunc({ |msg, time, addr, recvPort|
 	postln("buffer = " + bufNum + " | " + "node = " + nodeID);
 	
 	
-	~lyra.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
+	~status.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
+	~status2.sendMsg("newMonoSound", nodeID, bufNum, amp, xPos, zPos);
 	
 	s.sendMsg("s_new", "PlaySound", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \xPos, xPos, \yPos, yPos, \zPos, zPos, \xLPos, xLPos, \yLPos, yLPos, \zLPos, zLPos, \width, width, \mix, mix, \roomSize, roomSize, \loop, loop, \playRate, playRate, \trigger, trigger, \startFrame, startFrame);
 		
@@ -207,7 +213,7 @@ f = OSCFunc({ |msg, time, addr, recvPort|
 	amp = msg[2];
 	s.sendMsg("n_set", nodeID, \amp, amp);
 
-	postln("setVol!!");
+	//postln("setVol!!");
 		
 }, '/setVol', ~rem).add;
 );
@@ -222,7 +228,8 @@ f = OSCFunc({ |msg, time, addr, recvPort|
 	amp = msg[2];
 	envDur = msg[3];
 	s.sendMsg("n_set", nodeID, \amp, amp, \envDur, envDur);
-		
+	
+	//postln("fade");
 }, '/setVolEnv', ~rem).add;
 );
 
@@ -354,7 +361,8 @@ t = OSCFunc({ |msg, time, addr, recvPort|
 	trigger = msg[6];
 	startFrame = msg[7];
 	
-	~lyra.sendMsg("newStereoSound", nodeID, bufNum, amp);
+	~status.sendMsg("newStereoSound", nodeID, bufNum, amp);
+	~status2.sendMsg("newStereoSound", nodeID, bufNum, amp);
 	
 	s.sendMsg("s_new", "playStereo", nodeID, 0, 0, \bufNum, bufNum, \amp, amp, \loop, loop, \playRate, playRate, \trigger, trigger, \startFrame, startFrame);
 	postln("new stereo synth !!");	
@@ -449,8 +457,28 @@ k = OSCFunc({ |msg, time, addr, recvPort|
 	
 	postln("Volume is " + amp);
     
-		
+	~status.sendMsg("serverVol", amp);
+	~status2.sendMsg("serverVol", amp);
+	
 }, '/serverVol');
+);
+
+(
+k = OSCFunc({ |msg, time, addr, recvPort|
+	
+	var amp;
+	
+	amp = msg[1];
+	//remap range from 0.0 -- 1.0 to -10 -- 10
+	amp = amp.linlin(-1.0, 1.0, -40, 8, clip: \minmax);
+	v.volume = amp;
+	
+	postln("Volume PowerMate is " + amp);
+    
+	~status.sendMsg("serverVol", amp);
+	~status2.sendMsg("serverVol", amp);
+	
+}, '/serverVolPower');
 );
 
 
@@ -462,7 +490,10 @@ l = OSCFunc({ |msg, time, addr, recvPort|
 	v.mute;
 		
 	postln("MUTE!!");
-		
+
+	~status.sendMsg("audioMuted", 1);
+	~status2.sendMsg("audioMuted", 1);
+	
 }, '/mute');
 );
 
@@ -474,7 +505,10 @@ m = OSCFunc({ |msg, time, addr, recvPort|
 	v.unmute;
 	
 	postln("UNMUTE!!");
-		
+
+	~status.sendMsg("audioMuted", 0);
+	~status2.sendMsg("audioMuted", 0);
+	
 }, '/unMute');
 );
 
@@ -507,7 +541,10 @@ n = OSCFunc({ |msg, time, addr, recvPort|
 	x = Synth.new("PlayLyra");
 
 	postln("!! LYRA AUDIO LOADED !!");
-		
+	
+	~status.sendMsg("audioStereoEnabled");
+	~status2.sendMsg("audioStereoEnabled");
+	
 }, '/playLyraStereo');
 );
 
@@ -520,7 +557,10 @@ w = OSCFunc({ |msg, time, addr, recvPort|
 	x = Synth.new("PlayLyra");
 
 	postln("!! LYRA AUDIO LOADED !!");
-		
+
+	~status.sendMsg("audioStereoEnabled");
+	~status2.sendMsg("audioStereoEnabled");
+	
 }, '/playLyraStereoLocal');
 );
 
@@ -667,6 +707,7 @@ q = OSCFunc({ |msg, time, addr, recvPort|
 	 ct = SoundIn.ar(8, 1, amp);
 	 sb = SoundIn.ar(9, 1, amp);
 	 
+	 // 13 = rt; 7 = lt; 15 = rs; 5 = ls; 18= rb; 2 = lb; 10 = ct; 20 = sb
 	 Out.ar(13, rt);
 	 Out.ar(7, lt);
 	 Out.ar(15, rs);
@@ -688,7 +729,10 @@ q = OSCFunc({ |msg, time, addr, recvPort|
 	~seven = Synth.new("sevenOne");
 
 	postln("!! 7.1 CONNECTED !!");
-		
+	
+	~status.sendMsg("audioSurroundEnabled");
+	~status2.sendMsg("audioSurroundEnabled");
+	
 }, '/sevenOne');
 );
 
@@ -788,13 +832,13 @@ postln("        ");
 postln("        ");
 postln(" +++++ !!! CAVE2 AUDIO SERVER IS LOADED !!! +++++");
 postln(" ++++ Supports Omegalib Version 4.2 and above ++++ ");
+//postln(" ++++++++++ DEVELOPMENT BUILD 2014-7-12 ++++++++++ ");
 postln("        ");
 postln("        ");
 postln("        ");
 postln("  The file path '"+soundPath+"' will be pre-pended to all loaded sounds.");
 
 /////////////////////////////////////////////////////////////////////////////////
-
 
 )
 
